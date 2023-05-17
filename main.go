@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -13,9 +14,11 @@ import (
 type errMsg error
 
 type model struct {
-	spinner  spinner.Model
-	quitting bool
-	err      error
+	width, height int
+	spinner       spinner.Model
+	quitting      bool
+	err           error
+	ready         bool
 }
 
 var quitKeys = key.NewBinding(
@@ -47,12 +50,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errMsg:
 		m.err = msg
 		return m, nil
-
-	default:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
+	case tea.WindowSizeMsg:
+		if !m.ready {
+			m.width, m.height = msg.Width, msg.Height
+			m.ready = true
+		}
 	}
+	var cmd tea.Cmd
+	m.spinner, cmd = m.spinner.Update(msg)
+	return m, cmd
 }
 
 func (m model) View() string {
@@ -67,6 +73,16 @@ func (m model) View() string {
 }
 
 func main() {
+	if len(os.Getenv("DEBUG")) > 0 {
+		f, err := tea.LogToFile("debug.log", "debug")
+		log.Printf("In debug mode")
+		if err != nil {
+			fmt.Println("fatal:", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+	}
+
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Println(err)
